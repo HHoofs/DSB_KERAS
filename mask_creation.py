@@ -118,7 +118,10 @@ def plot_figures_from_arrays(arrays, sample):
 
     for i in range(len(arrays)):
         ax = fig.add_subplot(1, 3, i + 1)
-        ax.imshow(arrays[i], cmap=plt.get_cmap('hot'), interpolation='nearest')
+        if i != 2:
+            ax.imshow(arrays[i][:, :, 0], cmap=plt.get_cmap('hot'), interpolation='nearest')
+        else:
+            ax.imshow(arrays[i][:, :, 0], cmap=plt.get_cmap('hot'), interpolation='nearest', vmax=10)
         # ax.colorbar(im)
     fig.savefig('output__ne{}.png'.format(sample[:5]))
 

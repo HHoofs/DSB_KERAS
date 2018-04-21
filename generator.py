@@ -63,7 +63,7 @@ class DataGenerator(keras.utils.Sequence):
             rot = np.zeros(self.batch_size)
 
         if self.flipping:
-            flip = np.random.choice([True, False], (2,self.batch_size))
+            flip = np.random.choice([True, False], (2, self.batch_size))
         else:
             flip = np.zeros((2, self.batch_size), dtype=bool)
 
@@ -86,40 +86,45 @@ class DataGenerator(keras.utils.Sequence):
             with Image.open(os.path.join(self.path, sample, 'image.png')) as x_img:
                 x_img = x_img.convert(mode=self.mode)
                 x_arr = np.array(x_img)
-                if self.mode == 'L':
-                    x_arr = np.expand_dims(x_arr, -1)
                 # TODO: Specifiy height width in documentation
                 x_arr = resize(x_arr, output_shape=(self.dim[0], self.dim[1]))
 
-                _array_x = x_arr[:, :, 0]
-                _array_x = preprocess_array(_array_x, flip, i, rot, normalize=True)
+                _array_x = preprocess_array(x_arr, flip[:, i], rot[i], zoom_o[i], normalize=True)
 
                 x_image[i, ] = _array_x
 
+            with open(os.path.join(self.path, sample, 'mask_weight.npy'), 'rb') as read_numpy:
+                s_array = np.load(read_numpy)
 
-            with open(os.path.join(self.path, sample + '.npy'), 'rb') as read_numpy:
-                _numpy = np.load(read_numpy)
-                s_array = _numpy
+                _array_m = s_array[:, :, 0]
+                _array_m = preprocess_array(_array_m, flip[:, i], rot[i], zoom_o[i], normalize=False)
 
-                _array_m = s_array[:, :, 1]
-                _array_m = preprocess_array(_array_m, flip, i, rot, normalize=False)
+                # make sure that mask is 0 -- 1
+                _array_m = np.array(np.clip(np.round(_array_m), 0, 1), int)
 
                 y_mask_weight[i, :, :, 0:1] = _array_m
 
-                _array_w = s_array[:, :, 2]
-                _array_w = preprocess_array(_array_w, flip, i, rot, normalize=False)
+                _array_w = s_array[:, :, 1]
+                _array_w = preprocess_array(_array_w, flip[:, i], rot[i], zoom_o[i], normalize=False)
 
                 y_mask_weight[i, :, :, 1:2] = _array_w
+
+            # if zoom_o[i]:
+            # mask_creation.plot_figures_from_arrays([_array_x, _array_m, _array_w], sample)
 
         return x_image, y_mask_weight
 
 
-def preprocess_array(array, flip, i, rot, normalize=False):
-    array = np.rot90(array, rot[i])
-    if flip[0, i]:
+def preprocess_array(array, flip, rot, zoom, normalize=False):
+    array = np.rot90(array, rot)
+    if flip[0]:
         array = np.fliplr(array)
-    if flip[1, i]:
+    if flip[1]:
         array = np.flipud(array)
+    if zoom:
+        _size = array.shape
+        array = array[zoom[0]:zoom[2], zoom[1]:zoom[3]]
+        array = resize(array, output_shape=_size)
     if normalize:
         array *= 255.0 / array.max()
     array = np.expand_dims(array, 2)

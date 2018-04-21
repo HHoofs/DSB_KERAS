@@ -39,7 +39,7 @@ def weighted_cross_entropy(y_true, y_pred):
     return K.mean(tf.multiply(weight, entropy), axis=-1)
 
 
-def IOU_calc(y_true, y_pred):
+def iou_calc(y_true, y_pred):
     try:
         [seg, weight] = tf.unstack(y_true, 2, axis=3)
 
@@ -54,56 +54,80 @@ def IOU_calc(y_true, y_pred):
     return 2 * (inter + 1) / (K.sum(seg) + K.sum(pre) + 1)
 
 
-def create_model(filter_size = 16, drop_rate=.33):
-    img_input = Input(shape=(256,256,1), name='input_image')
+def create_model(filter_size=16, drop_rate=.33):
+    img_input = Input(shape=(256, 256, 1), name='input_image')
 
-    conv1 = Conv2D(filters=filter_size, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(img_input)
-    conv1 = Conv2D(filters=filter_size, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)
+    conv1 = Conv2D(filters=filter_size, kernel_size=3, strides=1, activation='relu', padding='same',
+                   kernel_initializer='he_normal')(img_input)
+    conv1 = Conv2D(filters=filter_size, kernel_size=3, strides=1, activation='relu', padding='same',
+                   kernel_initializer='he_normal')(conv1)
     pool1 = MaxPooling2D(2, 2)(conv1)
 
-    conv2 = Conv2D(filters=filter_size * 2, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(pool1)
-    conv2 = Conv2D(filters=filter_size * 2, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(conv2)
+    conv2 = Conv2D(filters=filter_size * 2, kernel_size=3, strides=1, activation='relu', padding='same',
+                   kernel_initializer='he_normal')(pool1)
+    conv2 = Conv2D(filters=filter_size * 2, kernel_size=3, strides=1, activation='relu', padding='same',
+                   kernel_initializer='he_normal')(conv2)
     pool2 = MaxPooling2D(2, 2)(conv2)
 
-    conv3 = Conv2D(filters=filter_size * 4, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(pool2)
-    conv3 = Conv2D(filters=filter_size * 4, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(conv3)
+    conv3 = Conv2D(filters=filter_size * 4, kernel_size=3, strides=1, activation='relu', padding='same',
+                   kernel_initializer='he_normal')(pool2)
+    conv3 = Conv2D(filters=filter_size * 4, kernel_size=3, strides=1, activation='relu', padding='same',
+                   kernel_initializer='he_normal')(conv3)
     pool3 = MaxPooling2D(2, 2)(conv3)
 
-    conv4 = Conv2D(filters=filter_size * 8, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(pool3)
-    conv4 = Conv2D(filters=filter_size * 8, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(conv4)
+    conv4 = Conv2D(filters=filter_size * 8, kernel_size=3, strides=1, activation='relu', padding='same',
+                   kernel_initializer='he_normal')(pool3)
+    conv4 = Conv2D(filters=filter_size * 8, kernel_size=3, strides=1, activation='relu', padding='same',
+                   kernel_initializer='he_normal')(conv4)
     drop4 = Dropout(drop_rate)(conv4)
     pool4 = MaxPooling2D(2, 2)(drop4)
 
-    conv5 = Conv2D(filters=filter_size * 16, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(pool4)
-    conv5 = Conv2D(filters=filter_size * 16, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(conv5)
+    conv5 = Conv2D(filters=filter_size * 16, kernel_size=3, strides=1, activation='relu', padding='same',
+                   kernel_initializer='he_normal')(pool4)
+    conv5 = Conv2D(filters=filter_size * 16, kernel_size=3, strides=1, activation='relu', padding='same',
+                   kernel_initializer='he_normal')(conv5)
     drop5 = Dropout(drop_rate)(conv5)
 
     # Upconvolutional layers
-    uconv4 = Conv2DTranspose(filters=filter_size * 8, kernel_size=2, strides=2, activation='relu', padding='same', kernel_initializer='he_normal')(drop5)
+    uconv4 = Conv2DTranspose(filters=filter_size * 8, kernel_size=2, strides=2, activation='relu', padding='same',
+                             kernel_initializer='he_normal')(drop5)
     uconc4 = concatenate([drop4, uconv4], axis=3)
-    uconv4 = Conv2D(filters=filter_size * 8, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(uconc4)
-    uconv4 = Conv2D(filters=filter_size * 8, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(uconv4)
+    uconv4 = Conv2D(filters=filter_size * 8, kernel_size=3, strides=1, activation='relu', padding='same',
+                    kernel_initializer='he_normal')(uconc4)
+    uconv4 = Conv2D(filters=filter_size * 8, kernel_size=3, strides=1, activation='relu', padding='same',
+                    kernel_initializer='he_normal')(uconv4)
 
-    uconv3 = Conv2DTranspose(filters=filter_size * 4, kernel_size=2, strides=2, activation='relu', padding='same', kernel_initializer='he_normal')(uconv4)
+    uconv3 = Conv2DTranspose(filters=filter_size * 4, kernel_size=2, strides=2, activation='relu', padding='same',
+                             kernel_initializer='he_normal')(uconv4)
     uconc3 = concatenate([conv3, uconv3], axis=3)
-    uconv3 = Conv2D(filters=filter_size * 4, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(uconc3)
-    uconv3 = Conv2D(filters=filter_size * 4, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(uconv3)
+    uconv3 = Conv2D(filters=filter_size * 4, kernel_size=3, strides=1, activation='relu', padding='same',
+                    kernel_initializer='he_normal')(uconc3)
+    uconv3 = Conv2D(filters=filter_size * 4, kernel_size=3, strides=1, activation='relu', padding='same',
+                    kernel_initializer='he_normal')(uconv3)
 
-    uconv2 = Conv2DTranspose(filters=filter_size * 2, kernel_size=2, strides=2, activation='relu', padding='same', kernel_initializer='he_normal')(uconv3)
+    uconv2 = Conv2DTranspose(filters=filter_size * 2, kernel_size=2, strides=2, activation='relu', padding='same',
+                             kernel_initializer='he_normal')(uconv3)
     uconc2 = concatenate([conv2, uconv2], axis=3)
-    uconv2 = Conv2D(filters=filter_size * 2, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(uconc2)
-    uconv2 = Conv2D(filters=filter_size * 2, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(uconv2)
+    uconv2 = Conv2D(filters=filter_size * 2, kernel_size=3, strides=1, activation='relu', padding='same',
+                    kernel_initializer='he_normal')(uconc2)
+    uconv2 = Conv2D(filters=filter_size * 2, kernel_size=3, strides=1, activation='relu', padding='same',
+                    kernel_initializer='he_normal')(uconv2)
 
-    uconv1 = Conv2DTranspose(filters=filter_size, kernel_size=2, strides=2, activation='relu', padding='same', kernel_initializer='he_normal')(uconv2)
+    uconv1 = Conv2DTranspose(filters=filter_size, kernel_size=2, strides=2, activation='relu', padding='same',
+                             kernel_initializer='he_normal')(uconv2)
     uconc1 = concatenate([conv1, uconv1], axis=3)
-    uconv1 = Conv2D(filters=filter_size, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(uconc1)
-    uconv1a = Conv2D(filters=filter_size, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(uconv1)
-    uconv1a = Conv2D(filters=2, kernel_size=3, strides=1, activation='relu', padding='same', kernel_initializer='he_normal')(uconv1a)
+    uconv1 = Conv2D(filters=filter_size, kernel_size=3, strides=1, activation='relu', padding='same',
+                    kernel_initializer='he_normal')(uconc1)
+    uconv1a = Conv2D(filters=filter_size, kernel_size=3, strides=1, activation='relu', padding='same',
+                     kernel_initializer='he_normal')(uconv1)
+    uconv1a = Conv2D(filters=2, kernel_size=3, strides=1, activation='relu', padding='same',
+                     kernel_initializer='he_normal')(uconv1a)
 
-    pred_mask = Conv2D(filters=1, kernel_size=1, strides=1, padding='same', activation='sigmoid', kernel_initializer='he_normal')(uconv1a)
+    pred_mask = Conv2D(filters=1, kernel_size=1, strides=1, padding='same', activation='sigmoid',
+                       kernel_initializer='he_normal')(uconv1a)
 
     model = Model(inputs=[img_input], outputs=[pred_mask])
-    model.compile(loss=weighted_cross_entropy, optimizer=Adam(lr=.0001), metrics=[IOU_calc])
+    model.compile(loss=weighted_cross_entropy, optimizer=Adam(lr=.0001), metrics=[iou_calc])
     return model
 
 
@@ -119,18 +143,20 @@ def train_model(path_img):
     model_x2.summary()
 
     labels = os.listdir(path_img)[1:]
-    labels = [label[:-4] for label in labels]
     training = labels[:608]
     validation = labels[608:]
     training_generator = generator.DataGenerator(training, path_img,
-                                                 rotation=True, flipping=True, zoom=1.25, batch_size = 8, dim=(256,256))
+                                                 rotation=True, flipping=True, zoom=1.25,
+                                                 batch_size=8, dim=(256, 256))
     validation_generator = generator.DataGenerator(validation, path_img,
-                                                 rotation=True, flipping=True, zoom=False, batch_size = 1, dim=(256,256))
+                                                   rotation=True, flipping=True, zoom=False,
+                                                   batch_size=1, dim=(256, 256))
 
     save_model, tensorboard, reduce_lr = create_callbacks()
 
-    model_x2.fit_generator(generator=training_generator, validation_data=validation_generator, epochs=128,
-                           callbacks=[tensorboard,reduce_lr])
+    model_x2.fit_generator(generator=training_generator, validation_data=validation_generator, epochs=256,
+                           callbacks=[tensorboard, reduce_lr])
+
 
 if __name__ == '__main__':
-    train_model('C:/Users/huubh/Documents/DSB2018/keras_2nd_take/arrays')
+    train_model('input')
