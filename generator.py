@@ -6,11 +6,15 @@ import numpy as np
 
 import mask_creation
 
+from PIL import Image
+
+from skimage.transform import resize
+
 
 class DataGenerator(keras.utils.Sequence):
     #Generates data for Keras
     def __init__(self, list_ids, path, batch_size=4, dim=(256, 256), n_channels=1, shuffle=True,
-                 rotation=False, flipping=False, zoom=False):
+                 rotation=False, flipping=False, zoom=False, mode='L'):
         #Initialization
         self.dim = dim
         self.batch_size = batch_size
@@ -21,6 +25,7 @@ class DataGenerator(keras.utils.Sequence):
         self.rotation = rotation
         self.flipping = flipping
         self.zoom = zoom
+        self.mode = mode
         self.on_epoch_end()
         self.indexes = np.arange(len(self.list_ids))
 
@@ -78,14 +83,23 @@ class DataGenerator(keras.utils.Sequence):
         # Generate data
         for i, sample in enumerate(list_ids_temp):
 
-            with open(os.path.join(self.path, sample + '.npy'), 'rb') as read_numpy:
-                _numpy = np.load(read_numpy)
-                s_array = _numpy
+            with Image.open(os.path.join(self.path, sample, 'image.png')) as x_img:
+                x_img = x_img.convert(mode=self.mode)
+                x_arr = np.array(x_img)
+                if self.mode == 'L':
+                    x_arr = np.expand_dims(x_arr, -1)
+                # TODO: Specifiy height width in documentation
+                x_arr = resize(x_arr, output_shape=(self.dim[0], self.dim[1]))
 
-                _array_x = s_array[:, :, 0]
+                _array_x = x_arr[:, :, 0]
                 _array_x = preprocess_array(_array_x, flip, i, rot, normalize=True)
 
                 x_image[i, ] = _array_x
+
+
+            with open(os.path.join(self.path, sample + '.npy'), 'rb') as read_numpy:
+                _numpy = np.load(read_numpy)
+                s_array = _numpy
 
                 _array_m = s_array[:, :, 1]
                 _array_m = preprocess_array(_array_m, flip, i, rot, normalize=False)

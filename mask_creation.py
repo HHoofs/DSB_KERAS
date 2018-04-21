@@ -10,20 +10,20 @@ from skimage.morphology import erosion
 
 import shutil
 
-import json
-
+BL = ['7b38c9173ebe69b4c6ba7e703c0c27f39305d9b2910f46405993d2ea7a963b80']
 
 def find_all_samples(path):
-    all_samples = os.listdir(path)
-    all_samples = [path for path in all_samples if path != '.DS_Store']
-    return all_samples
+    all_samples = [f.name for f in os.scandir(path) if f.is_dir()]
+    for sample in all_samples:
+        if sample not in BL:
+            yield sample
 
 
-def create_mask(path, out_path, out_height, out_width, mode='L'):
+def create_mask(path, out_path, out_height, out_width):
     samples = find_all_samples(path)
     # samples_dict = dict.fromkeys(samples)
     max_dist = []
-    for sample in tqdm.tqdm(samples[:]):
+    for sample in samples:
         # Sample path
         sample_path = os.path.join(path, sample)
         # Sample path with masks
@@ -49,18 +49,6 @@ def create_mask(path, out_path, out_height, out_width, mode='L'):
                     os.path.join(out_path, sample, 'image.png'))
         # plot_figures_from_arrays([img_array[:,:,0], complete_dist[:,:,0], complete_mask[:,:,0]], sample)
 
-        # gg.reshape((256,256,3))
-
-
-
-
-
-
-
-        # quit(0)
-
-
-
 
 def extract_array_from_image(path, sample, mode, height=None, width=None):
     with Image.open(os.path.join(path, sample, 'images', '{}.png'.format(sample))) as x_img:
@@ -73,7 +61,7 @@ def extract_array_from_image(path, sample, mode, height=None, width=None):
         return x_arr
 
 
-def compute_shortest_distance_matrix_resize_mask(complete_mask, distance_arra, height=None, width=None):
+def compute_shortest_distance_matrix_resize_mask(complete_mask, distance_arra):
     # complete distance matrix
     _freq = np.bincount(complete_mask.flatten())
     complete_dist = np.zeros_like(complete_mask, dtype=float)
@@ -113,7 +101,7 @@ def compute_distance_create_mask(masks, sample_path_masks, height=None, width=No
                 distance_arra = np.zeros((len(masks), height_set, width_set))
             # make array of mask
             _mask = np.array(_mask) / 255
-            _mask = resize(_mask, output_shape=(height_set,width_set))
+            _mask = resize(_mask, output_shape=(height_set, width_set))
             # Erode
             _mask = erosion(_mask)
             # add distance array
@@ -133,6 +121,7 @@ def plot_figures_from_arrays(arrays, sample):
         ax.imshow(arrays[i], cmap=plt.get_cmap('hot'), interpolation='nearest')
         # ax.colorbar(im)
     fig.savefig('output__ne{}.png'.format(sample[:5]))
+
 
 if __name__ == '__main__':
     create_mask('tmp', 'input', 256, 256)
