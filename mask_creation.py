@@ -7,6 +7,7 @@ from PIL import Image
 from skimage.transform import resize
 from scipy.ndimage.morphology import distance_transform_edt
 from skimage.morphology import erosion
+from skimage.segmentation import find_boundaries
 
 import shutil
 
@@ -19,9 +20,8 @@ def find_all_samples(path):
             yield sample
 
 
-def create_mask(path, out_path, out_height, out_width):
+def create_mask(path, out_path, out_height, out_width, plot=False):
     samples = find_all_samples(path)
-    # samples_dict = dict.fromkeys(samples)
     max_dist = []
     for sample in samples:
         # Sample path
@@ -37,9 +37,8 @@ def create_mask(path, out_path, out_height, out_width):
         # extract 2d mask with weight towards the two  closests cells
         complete_mask, complete_dist = compute_shortest_distance_matrix_resize_mask(org_size_mask, distance_arra)
 
+        # Store max weight
         max_dist.append(np.max(complete_dist))
-        # get array for image
-        # img_array = extract_array_from_image(path, sample, mode, out_height, out_width)
 
         image_mask_weight_array_concat = np.concatenate((complete_mask, complete_dist), axis=2)
 
@@ -47,7 +46,12 @@ def create_mask(path, out_path, out_height, out_width):
         np.save(os.path.join(out_path, sample, 'mask_weight.npy'), image_mask_weight_array_concat)
         shutil.copy(os.path.join(path, sample, 'images', '{}.png'.format(sample)),
                     os.path.join(out_path, sample, 'image.png'))
-        # plot_figures_from_arrays([img_array[:,:,0], complete_dist[:,:,0], complete_mask[:,:,0]], sample)
+
+        if plot:
+            img_array = extract_array_from_image(path, sample, 'L', out_height, out_width)
+            plot_figures_from_arrays([img_array, complete_dist, complete_mask], sample)
+
+    print("The range of the max weight of each distance matrix is: {0}--{1}".format(max_dist.min(),max_dist.max()))
 
 
 def extract_array_from_image(path, sample, mode, height=None, width=None):
@@ -96,20 +100,30 @@ def compute_distance_create_mask(masks, sample_path_masks, height=None, width=No
                 if height and width:
                     width_set, height_set = width, height
                 # Complete mask init
-                complete_mask = np.zeros((height_set, width_set))
+                complete_mask = np.zeros((len(masks), height_set, width_set))
+                final_mask = np.zeros((height_set, width_set))
                 # Distance array init
                 distance_arra = np.zeros((len(masks), height_set, width_set))
+                bound_araa = np.zeros((height_set, width_set)).astype(int)
             # make array of mask
             _mask = np.array(_mask) / 255
             _mask = resize(_mask, output_shape=(height_set, width_set))
+            _mask = np.round(_mask).astype(int)
             # Erode
-            _mask = erosion(_mask)
-            # add distance array
-            distance_arra[i, :, :] = distance_transform_edt(_mask == 0)
-            # create complete mask
-            complete_mask = np.maximum(complete_mask, _mask)
-    complete_mask = np.array(complete_mask, int)
-    return complete_mask, distance_arra
+            bound_araa = np.maximum(bound_araa, find_boundaries(_mask, mode='outer').astype(int))
+            complete_mask[i] = _mask
+
+    for i, _ in enumerate(masks):
+        _mask = complete_mask[i]
+        _mask[bound_araa==1] = 0
+
+        # add distance array
+        distance_arra[i, :, :] = distance_transform_edt(_mask == 0)
+        # create complete mask
+        final_mask = np.maximum(final_mask, _mask)
+
+    final_mask = np.array(final_mask, int)
+    return final_mask, distance_arra
 
 
 def plot_figures_from_arrays(arrays, sample):
@@ -121,7 +135,7 @@ def plot_figures_from_arrays(arrays, sample):
         if i != 2:
             ax.imshow(arrays[i][:, :, 0], cmap=plt.get_cmap('hot'), interpolation='nearest')
         else:
-            ax.imshow(arrays[i][:, :, 0], cmap=plt.get_cmap('hot'), interpolation='nearest', vmax=10)
+            ax.imshow(arrays[i][:, :, 0], cmap=plt.get_cmap('hot'), interpolation='nearest')
         # ax.colorbar(im)
     fig.savefig('output__ne{}.png'.format(sample[:5]))
 

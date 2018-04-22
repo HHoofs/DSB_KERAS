@@ -88,7 +88,8 @@ def create_model(filter_size=16, drop_rate=.33):
                    kernel_initializer='he_normal')(conv5)
     drop5 = Dropout(drop_rate)(conv5)
 
-    # Upconvolutional layers
+    # # # Upconvolutional layers
+    # Upconvolutional layer -4
     uconv4 = Conv2DTranspose(filters=filter_size * 8, kernel_size=2, strides=2, activation='relu', padding='same',
                              kernel_initializer='he_normal')(drop5)
     uconc4 = concatenate([drop4, uconv4], axis=3)
@@ -97,6 +98,7 @@ def create_model(filter_size=16, drop_rate=.33):
     uconv4 = Conv2D(filters=filter_size * 8, kernel_size=3, strides=1, activation='relu', padding='same',
                     kernel_initializer='he_normal')(uconv4)
 
+    # Upconvolutional layer -3
     uconv3 = Conv2DTranspose(filters=filter_size * 4, kernel_size=2, strides=2, activation='relu', padding='same',
                              kernel_initializer='he_normal')(uconv4)
     uconc3 = concatenate([conv3, uconv3], axis=3)
@@ -105,6 +107,7 @@ def create_model(filter_size=16, drop_rate=.33):
     uconv3 = Conv2D(filters=filter_size * 4, kernel_size=3, strides=1, activation='relu', padding='same',
                     kernel_initializer='he_normal')(uconv3)
 
+    # Upconvolutional -2
     uconv2 = Conv2DTranspose(filters=filter_size * 2, kernel_size=2, strides=2, activation='relu', padding='same',
                              kernel_initializer='he_normal')(uconv3)
     uconc2 = concatenate([conv2, uconv2], axis=3)
@@ -113,6 +116,7 @@ def create_model(filter_size=16, drop_rate=.33):
     uconv2 = Conv2D(filters=filter_size * 2, kernel_size=3, strides=1, activation='relu', padding='same',
                     kernel_initializer='he_normal')(uconv2)
 
+    # Upconvolutional - 1
     uconv1 = Conv2DTranspose(filters=filter_size, kernel_size=2, strides=2, activation='relu', padding='same',
                              kernel_initializer='he_normal')(uconv2)
     uconc1 = concatenate([conv1, uconv1], axis=3)
@@ -123,16 +127,21 @@ def create_model(filter_size=16, drop_rate=.33):
     uconv1a = Conv2D(filters=2, kernel_size=3, strides=1, activation='relu', padding='same',
                      kernel_initializer='he_normal')(uconv1a)
 
+    # Prediction
     pred_mask = Conv2D(filters=1, kernel_size=1, strides=1, padding='same', activation='sigmoid',
                        kernel_initializer='he_normal')(uconv1a)
 
+    # Set input and output
     model = Model(inputs=[img_input], outputs=[pred_mask])
+
+    # Compile with custom loss and metric and small LR
     model.compile(loss=weighted_cross_entropy, optimizer=Adam(lr=.0001), metrics=[iou_calc])
+
     return model
 
 
 def create_callbacks():
-    save_model = ModelCheckpoint('model_xlr_{epoch:02d}.hd5')
+    save_model = ModelCheckpoint('model_x2_{epoch:02d}.hd5', save_weights_only=True)
     tensorboard = TensorBoard('./logs', batch_size=8)
     reduce_lr = ReduceLROnPlateau(monitor='loss', factor=.2, verbose=1, patience=5, cooldown=25)
     return save_model, tensorboard, reduce_lr
@@ -145,8 +154,10 @@ def train_model(path_img):
     labels = os.listdir(path_img)[1:]
     training = labels[:608]
     validation = labels[608:]
+    model_x2.save('model_x2_start.h5')
+
     training_generator = generator.DataGenerator(training, path_img,
-                                                 rotation=True, flipping=True, zoom=1.25,
+                                                 rotation=True, flipping=True, zoom=False,
                                                  batch_size=8, dim=(256, 256))
     validation_generator = generator.DataGenerator(validation, path_img,
                                                    rotation=True, flipping=True, zoom=False,
@@ -155,7 +166,9 @@ def train_model(path_img):
     save_model, tensorboard, reduce_lr = create_callbacks()
 
     model_x2.fit_generator(generator=training_generator, validation_data=validation_generator, epochs=256,
-                           callbacks=[tensorboard, reduce_lr])
+                           callbacks=[save_model, tensorboard, reduce_lr])
+
+    model_x2.save('model_x2_end.h5')
 
 
 if __name__ == '__main__':
